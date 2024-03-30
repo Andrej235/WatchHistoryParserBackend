@@ -1,26 +1,32 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WatchHistoryBackend.Data;
+using WatchHistoryBackend.DTOs;
 using WatchHistoryBackend.Models;
+using WatchHistoryBackend.Services.Mapping;
 
 namespace WatchHistoryBackend.Controllers
 {
     [ApiController]
     [Route("api/song/")]
-    public class SongController(MusicContext context) : ControllerBase
+    public class SongController(MusicContext context, IMapper<Song, SongDTO> mapper) : ControllerBase
     {
         [HttpGet]
-        public IActionResult Get()
+        public IActionResult Get([FromQuery] string? artist, [FromQuery] string? song)
         {
             var songs = context.Songs.Include(x => x.Listens);
 
-            var songDTOs = songs.Select(x => new {
-                name = x.Name,
-                artist = x.Artist,
-                numberOfListens = x.Listens.Count()
-            });
+            if (artist is null && song is null)
+                return Ok(songs.Select(mapper.Map));
 
-            return Ok(songDTOs);
+            IEnumerable<Song> result = [];
+            if (artist is not null)
+                result = songs.Where(x => x.Artist.ToLower().Contains(artist.ToLower()));
+
+            if(song is not null)
+                result = songs.Where(x => x.Name.ToLower().Contains(song.ToLower()));
+
+            return Ok(result.Select(mapper.Map));
         }
 
         [HttpPost]
@@ -50,6 +56,21 @@ namespace WatchHistoryBackend.Controllers
                 });
 
                 await context.ListenedSongs.AddRangeAsync(listens);
+            }
+
+            await context.SaveChangesAsync();
+            return Ok();
+        }
+
+        [HttpPut("cleanup")]
+        public async Task<IActionResult> CleanUp()
+        {
+            foreach (var song in context.Songs)
+            {
+                song.Name = string.Join(' ', song.Name.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
+                song.SongLink = string.Join(' ', song.SongLink.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
+                song.Artist = string.Join(' ', song.Artist.Replace("- Topic", "").Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
+                song.ArtistLink = string.Join(' ', song.ArtistLink.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
             }
 
             await context.SaveChangesAsync();

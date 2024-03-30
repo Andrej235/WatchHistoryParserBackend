@@ -1,5 +1,8 @@
 
 using WatchHistoryBackend.Data;
+using WatchHistoryBackend.DTOs;
+using WatchHistoryBackend.Models;
+using WatchHistoryBackend.Services.Mapping;
 
 namespace WatchHistoryBackend
 {
@@ -12,6 +15,7 @@ namespace WatchHistoryBackend
             builder.Services.AddControllers();
 
             builder.Services.AddTransient<MusicContext>();
+            builder.Services.AddSingleton<IMapper<Song, SongDTO>, SongMapper>();
 
             builder.Services.AddCors(options =>
             {
