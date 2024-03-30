@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 using WatchHistoryBackend.Data;
 using WatchHistoryBackend.DTOs;
 using WatchHistoryBackend.Models;
@@ -12,21 +13,55 @@ namespace WatchHistoryBackend.Controllers
     public class SongController(MusicContext context, IMapper<Song, SongDTO> mapper) : ControllerBase
     {
         [HttpGet]
-        public IActionResult Get([FromQuery] string? artist, [FromQuery] string? song)
+        public IActionResult Get([FromQuery] string? q, [FromQuery] bool? strict)
         {
             var songs = context.Songs.Include(x => x.Listens);
 
-            if (artist is null && song is null)
-                return Ok(songs.Select(mapper.Map));
+            IEnumerable<Song> result = songs;
+            var criterias = DecipherQueryString(q);
 
-            IEnumerable<Song> result = [];
-            if (artist is not null)
-                result = songs.Where(x => x.Artist.ToLower().Contains(artist.ToLower()));
-
-            if(song is not null)
-                result = songs.Where(x => x.Name.ToLower().Contains(song.ToLower()));
+            if (strict ?? false)
+                foreach (var x in criterias)
+                    result = result.Where(x);
+            else
+                result = ApplyNonStrictCriterias(result, criterias);
 
             return Ok(result.Select(mapper.Map));
+        }
+
+        private static IEnumerable<Func<Song, bool>> DecipherQueryString(string? q)
+        {
+            if (q is null) return [];
+
+            //artist=againstthecurrent;song=blindfolded;fas
+
+            var keyValuePairs = q.Split(';').Select(x => x.Split('=').Select(x => x.Trim()).Where(x => !string.IsNullOrWhiteSpace(x))).Where(x => x.Count() == 2);
+            return keyValuePairs.Select(x => DecipherQueryString(x.First(), x.Last()));
+        }
+
+        private static Func<Song, bool> DecipherQueryString(string key, string value)
+        {
+            return key switch
+            {
+                "song" => x => x.Name.Trim(' ').ToLower().Contains(value.Trim(' ').ToLower()),
+                "name" => x => x.Name.Trim(' ').ToLower().Contains(value.Trim(' ').ToLower()),
+                "artist" => x => x.Artist.Trim(' ').ToLower().Contains(value.Trim(' ').ToLower()),
+                _ => _ => true
+            };
+        }
+
+        protected virtual IEnumerable<T> ApplyNonStrictCriterias<T>(IEnumerable<T> entitiesQueryable, IEnumerable<Func<T, bool>> criterias)
+        {
+            if (!criterias.Any())
+                return entitiesQueryable;
+
+            return criterias
+            .Select(x => entitiesQueryable.Where(x))
+            .SelectMany(x => x)
+            .GroupBy(x => x)
+            .OrderByDescending(g => g.Count())
+            .Select(x => x.First())
+            .AsQueryable();
         }
 
         [HttpPost]
