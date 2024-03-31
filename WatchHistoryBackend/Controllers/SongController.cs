@@ -97,20 +97,19 @@ namespace WatchHistoryBackend.Controllers
             return Ok();
         }
 
-        /*        [HttpPut("cleanup")]
-                public async Task<IActionResult> CleanUp()
-                {
-                    foreach (var song in context.Songs)
-                    {
-                        song.Name = string.Join(' ', song.Name.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
-                        song.SongLink = string.Join(' ', song.SongLink.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
-                        song.Artist = string.Join(' ', song.Artist.Replace("- Topic", "").Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
-                        song.ArtistLink = string.Join(' ', song.ArtistLink.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
-                    }
+        [HttpPut("cleanup")]
+        public async Task<IActionResult> CleanUp()
+        {
+            foreach (var song in context.Songs)
+            {
+                var cleanSong = CleanUp(song.Name, song.Artist);
+                song.Name = cleanSong.NewName;
+                song.Artist = cleanSong.NewArtistName;
+            }
 
-                    await context.SaveChangesAsync();
-                    return Ok();
-                }*/
+            await context.SaveChangesAsync();
+            return Ok();
+        }
 
         public class SongList
         {
@@ -131,19 +130,23 @@ namespace WatchHistoryBackend.Controllers
             }
         }
 
-
-
-        [HttpGet("byrecords")]
-        public IActionResult GetByRecords() => Ok(context.Songs.AsEnumerable().Select(x => Cleanup(x.Name, x.Artist)));
-
         public record CleanSongDTO(string NewName, string NewArtistName);
-        private static CleanSongDTO Cleanup(string songName, string artistName)
+        private static CleanSongDTO CleanUp(string songName, string artistName)
         {
-            string newSongName;
-            string? newArtistName;
+            string newSongName = string.Join(' ', songName.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
+            string? newArtistName = string.Join(' ', artistName.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
 
-            newSongName = songName.Replace("(Official Music Video)", "").Replace("(Official Video)", "").Replace("(Visualizer)", "").Trim();
-            newArtistName = artistName.Replace("Official", "").Replace("Band", "").Trim();
+            newSongName = newSongName.Replace("(Official Music Video)", "", StringComparison.OrdinalIgnoreCase)
+                                     .Replace("(Official Video)", "", StringComparison.OrdinalIgnoreCase)
+                                     .Replace("(Visualizer)", "", StringComparison.OrdinalIgnoreCase)
+                                     .Replace("(Official Lyric Video)", "", StringComparison.OrdinalIgnoreCase)
+                                     .Replace("(Lyric Video)", "", StringComparison.OrdinalIgnoreCase)
+                                     .Trim();
+
+            newArtistName = newArtistName.Replace("Official", "", StringComparison.OrdinalIgnoreCase)
+                                         .Replace("Topic", "", StringComparison.OrdinalIgnoreCase)
+                                         .Replace("Band", "", StringComparison.OrdinalIgnoreCase)
+                                         .Trim();
 
             if (!string.IsNullOrWhiteSpace(newArtistName) && newSongName != newArtistName)
                 newSongName = newSongName.Replace(newArtistName, "");
@@ -165,8 +168,11 @@ namespace WatchHistoryBackend.Controllers
                 return new CleanSongDTO(newSongName, "Error 404");
 
             newSongName = newSongName.Replace(newArtistName, "");
-            newSongName = newSongName.Replace("-", "").Trim();
-            newArtistName = newArtistName!.Trim('\n', '\"', '-').Trim();
+            newSongName = newSongName.Replace("-", "").Replace("\"", "").Trim();
+            newArtistName = newArtistName.Replace("-", "").Trim();
+
+            //newSongName = string.Join(' ', newSongName.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
+            //newArtistName = string.Join(' ', newArtistName.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
 
             return new CleanSongDTO(newSongName, newArtistName);
         }
