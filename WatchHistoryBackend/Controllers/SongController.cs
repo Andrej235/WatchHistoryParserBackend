@@ -69,6 +69,7 @@ namespace WatchHistoryBackend.Controllers
         }
         private static CleanSongDTO CleanUp(string songName, string artistName)
         {
+            //TODO: maybe delete all of the (x) from the song name, basically remove everything encased in b brackets
             string newSongName = string.Join(' ', songName.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
             string? newArtistName = string.Join(' ', artistName.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
 

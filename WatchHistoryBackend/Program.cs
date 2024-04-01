@@ -38,6 +38,15 @@ namespace WatchHistoryBackend
                         .AllowAnyMethod()
                         .AllowCredentials();
                     });
+
+                options.AddPolicy("LocalWebApp3000",
+                    builder =>
+                    {
+                        builder.WithOrigins("http://localhost:3000")
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .AllowCredentials();
+                    });
             });
 
             var app = builder.Build();
@@ -50,6 +59,7 @@ namespace WatchHistoryBackend
             app.MapControllers();
             app.UseCors("WebApp");
             app.UseCors("LocalWebApp");
+            app.UseCors("LocalWebApp3000");
             app.Run();
         }
     }
