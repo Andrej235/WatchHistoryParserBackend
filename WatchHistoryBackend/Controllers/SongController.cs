@@ -1,78 +1,35 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Linq.Expressions;
 using WatchHistoryBackend.Data;
 using WatchHistoryBackend.DTOs;
 using WatchHistoryBackend.Models;
 using WatchHistoryBackend.Services.Mapping;
+using WatchHistoryBackend.Services.Read;
 
 namespace WatchHistoryBackend.Controllers
 {
     [ApiController]
     [Route("api/song/")]
-    public class SongController(MusicContext context, IMapper<Song, SongDTO> mapper) : ControllerBase
+    public partial class SongController(MusicContext context,
+                                        IReadService<Song> readService,
+                                        IMapper<Song, SongDTO> mapper) : ControllerBase
     {
         [HttpGet]
-        public IActionResult Get([FromQuery] string? q, [FromQuery] bool? strict)
+        public async Task<IActionResult> Get([FromQuery] string? q, [FromQuery] bool? strict, [FromQuery] int? offset, [FromQuery] int? limit)
         {
-            var songs = context.Songs.Include(x => x.Listens);
-
-            IEnumerable<Song> result = songs;
-            var criterias = DecipherQueryString(q);
-
-            if (strict ?? false)
-                foreach (var x in criterias)
-                    result = result.Where(x);
-            else
-                result = ApplyNonStrictCriterias(result, criterias);
-
+            var result = await readService.Get(q, strict, offset, limit);
             return Ok(result.Select(mapper.Map));
         }
 
-        private static IEnumerable<Func<Song, bool>> DecipherQueryString(string? q)
-        {
-            if (q is null) return [];
-
-            //artist=againstthecurrent;song=blindfolded;fas
-
-            var keyValuePairs = q.Split(';').Select(x => x.Split('=').Select(x => x.Trim()).Where(x => !string.IsNullOrWhiteSpace(x))).Where(x => x.Count() == 2);
-            return keyValuePairs.Select(x => DecipherQueryString(x.First(), x.Last()));
-        }
-
-        private static Func<Song, bool> DecipherQueryString(string key, string value)
-        {
-            return key switch
-            {
-                "song" => x => x.Name.Trim(' ').ToLower().Contains(value.Trim(' ').ToLower()),
-                "name" => x => x.Name.Trim(' ').ToLower().Contains(value.Trim(' ').ToLower()),
-                "artist" => x => x.Artist.Trim(' ').ToLower().Contains(value.Trim(' ').ToLower()),
-                _ => _ => true
-            };
-        }
-
-        protected virtual IEnumerable<T> ApplyNonStrictCriterias<T>(IEnumerable<T> entitiesQueryable, IEnumerable<Func<T, bool>> criterias)
-        {
-            if (!criterias.Any())
-                return entitiesQueryable;
-
-            return criterias
-            .Select(x => entitiesQueryable.Where(x))
-            .SelectMany(x => x)
-            .GroupBy(x => x)
-            .OrderByDescending(g => g.Count())
-            .Select(x => x.First())
-            .AsQueryable();
-        }
-
         [HttpPost]
-        public async Task<IActionResult> Add([FromBody] SongList songList)
+        public async Task<IActionResult> Add([FromBody] SongListDTO songList)
         {
             context.Database.EnsureDeleted();
             context.Database.EnsureCreated();
 
             foreach (var songListenList in songList.Songs)
             {
-                SongList.SongDTO songDTO = songListenList.First().Song;
+                SongListDTO.SongDTO songDTO = songListenList.First().Song;
                 Song song = new()
                 {
                     Name = songDTO.Name ?? "---> Empty / 404",
@@ -110,27 +67,6 @@ namespace WatchHistoryBackend.Controllers
             await context.SaveChangesAsync();
             return Ok();
         }
-
-        public class SongList
-        {
-            public IEnumerable<IEnumerable<ListenedSongDTO>> Songs { get; set; } = null!;
-
-            public class ListenedSongDTO
-            {
-                public SongDTO Song { get; set; } = null!;
-                public string Time { get; set; } = null!;
-            }
-
-            public class SongDTO
-            {
-                public string? Name { get; set; }
-                public string? SongLink { get; set; }
-                public string? Artist { get; set; }
-                public string? ArtistLink { get; set; }
-            }
-        }
-
-        public record CleanSongDTO(string NewName, string NewArtistName);
         private static CleanSongDTO CleanUp(string songName, string artistName)
         {
             string newSongName = string.Join(' ', songName.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
