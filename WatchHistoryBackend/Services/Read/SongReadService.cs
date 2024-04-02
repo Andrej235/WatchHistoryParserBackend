@@ -23,7 +23,13 @@ namespace WatchHistoryBackend.Services.Read
 
         private static IEnumerable<Func<Song, bool>> DecipherQueryString(string q)
         {
-            var keyValuePairs = q.Split(';').Select(x => x.Split('=').Select(x => x.Trim()).Where(x => !string.IsNullOrWhiteSpace(x))).Where(x => x.Count() == 2);
+            var split = q.Split('&');
+            if (split.Length == 0)
+                return [];
+            else if (split.Length == 1 && !split[0].Contains('='))
+                return [x => x.Name.Trim(' ').ToLower().Contains(split[0].Trim(' ').ToLower()) || x.Artist.Trim(' ').ToLower().Contains(split[0].Trim(' ').ToLower())];
+
+            var keyValuePairs = split.Select(x => x.Split('=').Select(x => x.Trim()).Where(x => !string.IsNullOrWhiteSpace(x))).Where(x => x.Count() == 2);
             return keyValuePairs.Select(x => DecipherQueryString(x.First(), x.Last()));
         }
 

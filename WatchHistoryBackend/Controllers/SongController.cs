@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using System.Text.RegularExpressions;
 using WatchHistoryBackend.Data;
 using WatchHistoryBackend.DTOs;
 using WatchHistoryBackend.Models;
@@ -69,16 +69,11 @@ namespace WatchHistoryBackend.Controllers
         }
         private static CleanSongDTO CleanUp(string songName, string artistName)
         {
-            //TODO: maybe delete all of the (x) from the song name, basically remove everything encased in b brackets
             string newSongName = string.Join(' ', songName.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
             string? newArtistName = string.Join(' ', artistName.Split(" ").Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()));
 
-            newSongName = newSongName.Replace("(Official Music Video)", "", StringComparison.OrdinalIgnoreCase)
-                                     .Replace("(Official Video)", "", StringComparison.OrdinalIgnoreCase)
-                                     .Replace("(Visualizer)", "", StringComparison.OrdinalIgnoreCase)
-                                     .Replace("(Official Lyric Video)", "", StringComparison.OrdinalIgnoreCase)
-                                     .Replace("(Lyric Video)", "", StringComparison.OrdinalIgnoreCase)
-                                     .Trim();
+            newSongName = BracketsRegex().Replace(newSongName, string.Empty);
+            newArtistName = BracketsRegex().Replace(newArtistName, string.Empty);
 
             newArtistName = newArtistName.Replace("Official", "", StringComparison.OrdinalIgnoreCase)
                                          .Replace("Topic", "", StringComparison.OrdinalIgnoreCase)
@@ -121,5 +116,8 @@ namespace WatchHistoryBackend.Controllers
 
             return start > 0 && end > start ? name[start..end] : string.Empty;
         }
+
+        [GeneratedRegex(@"\([^()]*\)|\[[^[]*\]")]
+        private static partial Regex BracketsRegex();
     }
 }
