@@ -54,6 +54,26 @@ namespace WatchHistoryBackend.Controllers
             return Ok();
         }
 
+        [HttpGet("artistname")]
+        public async Task<IActionResult> GetByArtistsName()
+        {
+            var songs = await readService.Get("", false, 0, -1);
+            var resultByName = songs.GroupBy(x => x.Artist).Select(x => new
+            {
+                x.First().Artist,
+                x.First().ArtistLink,
+                SongsCount = x.Count(),
+                Songs = x.Select(x => new
+                {
+                    x.Name,
+                    x.SongLink,
+                    Listens = x.Listens.Count()
+                })
+            }).OrderByDescending(x => x.SongsCount).Take(10);
+
+            return Ok(resultByName);
+        }
+
         [HttpPut("cleanup")]
         public async Task<IActionResult> CleanUp()
         {
